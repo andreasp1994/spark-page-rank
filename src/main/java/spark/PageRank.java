@@ -3,6 +3,7 @@ package spark;
 import java.io.Serializable;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -23,18 +24,14 @@ public class PageRank {
 	public static void main(String[] args) {
 		JavaSparkContext sc = new JavaSparkContext(new SparkConf().setAppName("WordCount-v0").setMaster("local"));
 		sc.hadoopConfiguration().set("textinputformat.record.delimiter", "\n\n");
-		JavaPairRDD<String, Tuple2<Double, Set<String>>> RDD =  preprocessRevisions(sc.textFile(args[0]), args[2]);
-		JavaPairRDD<String, Set<String>> outgoingLinksRDD = RDD.mapToPair(r -> {
-			return new Tuple2<String, Set<String>>(r._1(), r._2()._2());
-		});
-		calculatePageRank(RDD, outgoingLinksRDD, 5)
-			.mapValues(v -> v._1())
-			.map(r -> r._1 + "\t" + r._2.get())
+		JavaPairRDD<String, Set<String>> links =  preprocessRevisions(sc.textFile(args[0]), args[2]);
+		calculatePageRank(links, 5)
+			.map(r -> r._1 + "\t" + r._2)
 			.saveAsTextFile(args[1]);
 		sc.close();
 	}
 	
-	private static JavaPairRDD<String, Tuple2<Double, Set<String>>> preprocessRevisions(JavaRDD<String> rdd, String date) { 
+	private static JavaPairRDD<String, Set<String>> preprocessRevisions(JavaRDD<String> rdd, String date) { 
 		try {
 			Long argumentTimestamp = ISO8601.toTimeMS(date);
 			return rdd.mapToPair(s -> {
@@ -58,7 +55,7 @@ public class PageRank {
 				else return v1;
 			})
 			.mapToPair((record) -> {
-				return new Tuple2<String, Tuple2<Double, Set<String>>>(record._1(), new Tuple2<Double, Set<String>>(1.0, record._2()._2()));
+				return new Tuple2<String, Set<String>>(record._1(), record._2()._2());
 			});
 		} catch (ParseException e) {
 			System.out.println("The specified date was not in correct format!");
@@ -69,52 +66,24 @@ public class PageRank {
 		
 	}
 	
-	private static JavaPairRDD<String, Tuple2<Optional<Double>, Set<String>>> calculatePageRank(JavaPairRDD<String, Tuple2<Double, Set<String>>> rdd,
-			JavaPairRDD<String, Set<String>> outgoingLinksRDD,
+	private static JavaPairRDD<String, Double> calculatePageRank(
+			JavaPairRDD<String, Set<String>> links,
 			int iterations) {
-		
-		JavaPairRDD<String, Tuple2<Optional<Double>, Set<String>>> newPageRanks = rdd
-				.mapValues(v -> new Tuple2<Optional<Double>, Set<String>>( Optional.fromNullable(v._1()), v._2()));
+		// Initialize Ranks
+		JavaPairRDD<String, Double> ranks = links.mapValues( v -> 1.0);
 		for (int i = 0;i < iterations; i++) {
-			newPageRanks.saveAsTextFile("inter" + i);
-			JavaPairRDD<String, Double> pageRankRDD = newPageRanks.flatMapToPair(r -> {
+			JavaPairRDD<String, Double> contributionsRdd = links.join(ranks).flatMapToPair(r -> {
 				List<Tuple2<String, Double>> contributions = new ArrayList<Tuple2<String, Double>>();
-				for (String outgoingLink: r._2()._2()) {
-					// Maybe can refactor this optional here
-					Double contribution = 0.15;
-					if (r._2()._1().isPresent()) {
-						contribution = r._2()._1().get();
-					}
-					contribution /= r._2()._2().size();
-					contributions.add(new Tuple2<String, Double>(outgoingLink, contribution));
+				contributions.add(new Tuple2<String, Double>(r._1, 0.0));
+				for(String outLink: r._2()._1()) {
+					Double contribution = r._2._2/r._2._1.size();
+					contributions.add(new Tuple2<String, Double>(outLink, contribution));
 				}
 				return contributions;
-			})
-			.reduceByKey((cont1, cont2) -> cont1 + cont2)
-			.mapValues(v -> 0.15 + 0.85 * v);
-			newPageRanks = pageRankRDD.rightOuterJoin(outgoingLinksRDD);
-			
-			// Sort
-//					.mapToPair(r -> new Tuple2<Tuple2<Double,Set<String>>, String>(r._2(), r._1()))
-//					.sortByKey(new TupleComparator())
-//					.mapToPair(r -> new Tuple2<String, Tuple2<Double, Set<String>>>(r._2(), r._1()));
+			});
+			ranks = contributionsRdd.reduceByKey((c1, c2) -> c1 + c2)
+					.mapValues(v -> 0.15 + 0.85 * v);
 		}
-		return newPageRanks;
+		return ranks;
 	}
-	
-	
-	static class TupleComparator implements Comparator<Tuple2<Double,Set<String>>>, Serializable {
-		private static final long serialVersionUID = 1L;
-		
-		@Override
-		public int compare(Tuple2<Double,Set<String>> v1, Tuple2<Double,Set<String>> v2) {
-		    if (v1._1() > (v2._1())) {
-		        return -1;
-		    } else if (v1._1() < (v2._1())) {
-		        return 1;
-		    }
-		    return 0;
-		}
-	}
-	
 }
