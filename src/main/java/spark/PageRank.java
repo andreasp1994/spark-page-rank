@@ -1,10 +1,7 @@
 package spark;
 
-import java.io.Serializable;
 import java.text.ParseException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -14,8 +11,6 @@ import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 
-import com.google.common.base.Optional;
-
 import scala.Tuple2;
 import utils.ISO8601;
 
@@ -24,8 +19,8 @@ public class PageRank {
 	public static void main(String[] args) {
 		JavaSparkContext sc = new JavaSparkContext(new SparkConf().setAppName("WordCount-v0").setMaster("local"));
 		sc.hadoopConfiguration().set("textinputformat.record.delimiter", "\n\n");
-		JavaPairRDD<String, Set<String>> links =  preprocessRevisions(sc.textFile(args[0]), args[2]);
-		calculatePageRank(links, 5)
+		JavaPairRDD<String, Set<String>> links =  preprocessRevisions(sc.textFile(args[0]), args[3]);
+		calculatePageRank(links, Integer.valueOf(args[2]))
 			.map(r -> r._1 + "\t" + r._2)
 			.saveAsTextFile(args[1]);
 		sc.close();
