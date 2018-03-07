@@ -17,7 +17,7 @@ import utils.ISO8601;
 public class PageRank {
 	
 	public static void main(String[] args) {
-		JavaSparkContext sc = new JavaSparkContext(new SparkConf().setAppName("WordCount-v0").setMaster("local"));
+		JavaSparkContext sc = new JavaSparkContext(new SparkConf().setAppName("PageRank"));
 		sc.hadoopConfiguration().set("textinputformat.record.delimiter", "\n\n");
 		JavaPairRDD<String, Set<String>> links =  preprocessRevisions(sc.textFile(args[0]), args[3]);
 		calculatePageRank(links, Integer.valueOf(args[2]))
