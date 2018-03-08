@@ -48,7 +48,7 @@ public class PageRank {
 				else return v1;
 			})
 			.mapToPair((record) -> {	// Return that article title with the outlinks
-				return new Tuple2<String, String[]>(record._1(), (String[]) record._2()._2().toArray());
+				return new Tuple2<String, String[]>(record._1(), (String[]) record._2()._2().toArray(new String[record._2()._2().size()]));
 			});
 		} catch (ParseException e) {
 			System.out.println("The specified date was not in correct format!");
