@@ -6,7 +6,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.spark.HashPartitioner;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
@@ -42,10 +41,14 @@ public class PageRank {
 				return new Tuple2<String, Tuple2<String, Set<String>>>(revisionFields[3],
 						new Tuple2<String, Set<String>>(revisionFields[4], linksOut));
 			})
-			.reduceByKey((v1, v2)-> {	// Get the closest revision date that predates argument date
+			.filter(revision -> { // Filter all the revisions that predates the specified date
+				Long revisionTimestamp = ISO8601.toTimeMS(revision._2()._1());
+				return revisionTimestamp <= argumentTimestamp;
+			})
+			.reduceByKey((v1, v2)-> {	// Get the latest revision date that predates argument date
 				Long previousRevisionTimestamp = ISO8601.toTimeMS(v1._1());
 				Long revisionTimestamp = ISO8601.toTimeMS(v2._1());
-				if (revisionTimestamp > previousRevisionTimestamp && revisionTimestamp <= argumentTimestamp) return v2;
+				if (revisionTimestamp > previousRevisionTimestamp) return v2;
 				else return v1;
 			})
 			.mapToPair((record) -> {	// Return that article title with the outlinks
