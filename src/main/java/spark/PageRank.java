@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.spark.HashPartitioner;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
@@ -61,7 +62,8 @@ public class PageRank {
 	private static JavaPairRDD<String, Double> calculatePageRank(
 			JavaPairRDD<String, String[]> links,
 			int iterations) {
-		links.cache();
+		
+		links.partitionBy(new HashPartitioner(8)).cache();
 		// Initialize Ranks with a value of 1.0
 		JavaPairRDD<String, Double> ranks = links.mapValues( v -> 1.0);
 		for (int i = 0;i < iterations; i++) {
