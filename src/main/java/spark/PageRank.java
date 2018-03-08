@@ -63,7 +63,7 @@ public class PageRank {
 			JavaPairRDD<String, String[]> links,
 			int iterations) {
 		
-		links.partitionBy(new HashPartitioner(8)).cache();
+		links.cache();
 		// Initialize Ranks with a value of 1.0
 		JavaPairRDD<String, Double> ranks = links.mapValues( v -> 1.0);
 		for (int i = 0;i < iterations; i++) {
